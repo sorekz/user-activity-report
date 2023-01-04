@@ -1,11 +1,17 @@
-name: 'Your name here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
+name: 'Github Organization Activity Report'
+description: 'Create a user activity report for a Github organization'
+author: 'Daniel Benesch'
 inputs:
-  milliseconds: # change this
+  token:
+    description: 'Github access token for the organization'
     required: true
-    description: 'input description here'
-    default: 'default value if applicable'
+  organization:
+    description: 'The organization to create the report for'
+    required: true
+  since-days:
+    description: 'The number of days in the past to search for activity for'
+    required: true
+    default: 90
 runs:
   using: 'node16'
   main: 'dist/index.js'
