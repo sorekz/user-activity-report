@@ -34,6 +34,31 @@ You can see the report in the action run summary
 | sorekz | ✔️ | ✔️ | 8 | 2 | 2 | 1 | 1 | 1 | 1 | 2 |
 | dependabot | ❌ | ✔️ | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 |
 
+## Example CSV and JSON reports
+You can enable the option to write the report as csv and/or json output and use the actions/upload-artifact action to upload them. The zip file containings both reports can be downloaded afterwards in the action run.
+```yaml
+name: 'User Activity Report'
+on:
+  workflow_dispatch:
+  
+jobs:
+  'create-report':
+    runs-on: ubuntu-latest
+    steps:
+      - uses: sorekz/user-activity-report@v1
+        with:
+          token: ${{ secrets.TOKEN }}
+          organization: 'your-org'
+          create-json: data.json
+          create-csv: data.csv
+      - uses: actions/upload-artifact@v3
+        with:
+          name: reports
+          path: |
+            data.json
+            data.csv
+```
+
 ## Inputs
 ### token
 **Required** Github access token for the organization. Required permissions are `repo`, `read:org`
@@ -91,8 +116,6 @@ default: `true`
 - Commits are only counted once. If you have `analyze-commits-on-all-branches` enabled then a commit that is part of multiple branches is only counted once. If you use merge commits a new commit with a new git ref is created and counted.
 - Commits that have been authored but not committed before `since-days` are not counted. The commit date is relevant.
 - A merged pull request is counted both in *Created PRs* and *Merged PRs* if it was created and merged within `since-days`
-
-
 
 ## Rate limit cost
 The cost is nested so you can multiply each indention and sum it up. It is approximately:
