@@ -1,105 +1,114 @@
-<p align="center">
-  <a href="https://github.com/actions/typescript-action/actions"><img alt="typescript-action status" src="https://github.com/actions/typescript-action/workflows/build-test/badge.svg"></a>
-</p>
+# user-activity-report
+Create a User Activity Report for your Github organization. The action uses the Github GraphQL API and depending on the size of your organization will fetch a lot of data.
 
-# Create a JavaScript Action using TypeScript
+If you get an error because you reach the hourly rate limit of 5000 points you can either reduce the `since-days` or play with the other inputs. Comments cost a lot of points so you might want to disable them if not needed.
 
-Use this template to bootstrap the creation of a TypeScript action.:rocket:
+The action only fetches nested information on objects that have updates since `since-days`. So the total rate limit cost varies depending on the created/updated objects in the time window. It is printed at the end of the action and can be seen in the workflow logs.
 
-This template includes compilation support, tests, a validation workflow, publishing, and versioning guidance.  
+💡 By default only the commits on the default branch are analyzed because usually the activity on other branches ends up in pull requests. You can set `analyze-commits-on-all-branches` to `true` to count commits on all branches.
 
-If you are new, there's also a simpler introduction.  See the [Hello World JavaScript Action](https://github.com/actions/hello-world-javascript-action)
-
-## Create an action from this template
-
-Click the `Use this Template` and provide the new repo details for your action
-
-## Code in Main
-
-> First, you'll need to have a reasonably modern version of `node` handy. This won't work with versions older than 9, for instance.
-
-Install the dependencies  
-```bash
-$ npm install
-```
-
-Build the typescript and package it for distribution
-```bash
-$ npm run build && npm run package
-```
-
-Run the tests :heavy_check_mark:  
-```bash
-$ npm test
-
- PASS  ./index.test.js
-  ✓ throws invalid number (3ms)
-  ✓ wait 500 ms (504ms)
-  ✓ test runs (95ms)
-
-...
-```
-
-## Change action.yml
-
-The action.yml defines the inputs and output for your action.
-
-Update the action.yml with your name, description, inputs and outputs for your action.
-
-See the [documentation](https://help.github.com/en/articles/metadata-syntax-for-github-actions)
-
-## Change the Code
-
-Most toolkit and CI/CD operations involve async operations so the action is run in an async function.
-
-```javascript
-import * as core from '@actions/core';
-...
-
-async function run() {
-  try { 
-      ...
-  } 
-  catch (error) {
-    core.setFailed(error.message);
-  }
-}
-
-run()
-```
-
-See the [toolkit documentation](https://github.com/actions/toolkit/blob/master/README.md#packages) for the various packages.
-
-## Publish to a distribution branch
-
-Actions are run from GitHub repos so we will checkin the packed dist folder. 
-
-Then run [ncc](https://github.com/zeit/ncc) and push the results:
-```bash
-$ npm run package
-$ git add dist
-$ git commit -a -m "prod dependencies"
-$ git push origin releases/v1
-```
-
-Note: We recommend using the `--license` option for ncc, which will create a license file for all of the production node modules used in your project.
-
-Your action is now published! :rocket: 
-
-See the [versioning documentation](https://github.com/actions/toolkit/blob/master/docs/action-versioning.md)
-
-## Validate
-
-You can now validate the action by referencing `./` in a workflow in your repo (see [test.yml](.github/workflows/test.yml))
-
-```yaml
-uses: ./
-with:
-  milliseconds: 1000
-```
-
-See the [actions tab](https://github.com/actions/typescript-action/actions) for runs of this action! :rocket:
 
 ## Usage:
+```yaml
+name: 'User Activity Report'
+on:
+  workflow_dispatch:
+  
+jobs:
+  'create-report':
+    runs-on: ubuntu-latest
+    steps:
+      - uses: sorekz/user-activity-report@v1
+        with:
+          token: ${{ secrets.TOKEN }}
+          organization: 'your-org'
+```
 
-After testing you can [create a v1 tag](https://github.com/actions/toolkit/blob/master/docs/action-versioning.md) to reference the stable and latest V1 action
+
+## Example report
+You can see the report in the action run summary
+
+| User | Org member | Active | Commits | Created Issues | Issue Comments | Created PRs | Merged PRs | PR Comments | Created Discussions | Discussion Comments |
+|---|---|---|---|---|---|---|---|---|---|---|
+| daniel | ✔️ | ❌ | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| sorekz | ✔️ | ✔️ | 8 | 2 | 2 | 1 | 1 | 1 | 1 | 2 |
+| dependabot | ❌ | ✔️ | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 |
+
+## Inputs
+### token
+**Required** Github access token for the organization. Required permissions are `repo`, `read:org`
+
+### organization
+**Required** The organization to create the report for
+
+### since-days
+**Required** The number of days in the past to search for activity for. One day is relative to the start time and equal to 24 hours.\
+default: `90`
+
+### analyze-commits
+Enable to analyze commits\
+default: `true`
+
+### analyze-commits-on-all-branches
+Enable to analyze commits on all branches. By default only commits on the default branches are analyzed. Ignored if `analyze-commits` is `false`\
+default: `false`
+
+### analyze-issues
+Enable to analyze issues\
+default: `true`
+
+### analyze-issue-comments
+Enable to analyze issue comments\
+default: `true`
+
+### analyze-pull-requests
+Enable to analyze pull requests\
+default: `true`
+
+### analyze-pull-request-comments
+Enable to analyze pull requests comments\
+default: `true`
+
+### analyze-discussions
+Enable to analyze discussions\
+default: `true`
+
+### analyze-discussion-comments
+Enable to analyze discussions comments\
+default: `true`
+
+### create-json
+Save the report as json file to this path
+
+### create-csv
+Save the report as csv file to this path
+
+### create-summary
+Write the report as step summary to the github action\
+default: `true`
+
+## Need to know
+- Commits are only counted once. If you have `analyze-commits-on-all-branches` enabled then a commit that is part of multiple branches is only counted once. If you use merge commits a new commit with a new git ref is created and counted.
+- Commits that have been authored but not committed before `since-days` are not counted. The commit date is relevant.
+- A merged pull request is counted both in *Created PRs* and *Merged PRs* if it was created and merged within `since-days`
+
+
+
+## Rate limit cost
+The cost is nested so you can multiply each indention and sum it up. It is approximately:
+- 1 per 100 organization members
+- 1 per 100 repositories
+  - 1 per 100 branches in each repository
+    - 1 per 100 commits since `since-days` in each branch
+  - 1 per 100 issues created/updated `since-days` in each repository
+    - 1 per 100 issue comments in each issue
+  - 1 per 100 pull requests in each repository
+    - 1 per 100 pull request comments in each pull request
+  - 1 per 100 discussions in each repository
+    - 1 per 100 discussion comments in each pull request
+
+Because the pull requests and discussions can not be queried based on a timestamp the action always fetches all but filters comments only for the objects that have updates (including added comments) since `since-days`.
+
+---
+
+This action was inspired by Peter Murray's https://github.com/peter-murray/inactive-users-action
