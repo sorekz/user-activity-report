@@ -1,16 +1,41 @@
 import * as core from '@actions/core'
-import {wait} from './wait'
+import * as fs from 'fs'
+import { createReport } from './report'
+import { AnalyzeOptions } from './reportData'
 
 async function run(): Promise<void> {
   try {
-    const ms: string = core.getInput('milliseconds')
-    core.debug(`Waiting ${ms} milliseconds ...`) // debug is only output if you set the secret `ACTIONS_STEP_DEBUG` to true
+    const options: AnalyzeOptions = {
+      commits: core.getBooleanInput('analyze-commits'),
+      commitsOnAllBranches: core.getBooleanInput('analyze-commits-on-all-branches'),
+      issues: core.getBooleanInput('analyze-issues'),
+      issueComments: core.getBooleanInput('analyze-issue-comments'),
+      pullRequests: core.getBooleanInput('analyze-pull-requests'),
+      pullRequestComments: core.getBooleanInput('analyze-pull-request-comments'),
+      discussions: core.getBooleanInput('analyze-discussions'),
+      discussionComments: core.getBooleanInput('analyze-discussion-comments')
+    }
+    options.issueComments = options.issues && options.issueComments
+    options.pullRequestComments = options.pullRequests && options.pullRequestComments
+    options.discussionComments = options.discussions && options.discussionComments
 
-    core.debug(new Date().toTimeString())
-    await wait(parseInt(ms, 10))
-    core.debug(new Date().toTimeString())
+    const report = await createReport(
+      core.getInput('token'),
+      core.getInput('organization'),
+      parseInt(core.getInput('since-days')),
+      options
+    )
 
-    core.setOutput('time', new Date().toTimeString())
+    if (core.getInput('create-json')) {
+      fs.writeFileSync(core.getInput('create-json'), report.toJSON(), { encoding: 'utf-8' })
+    }
+    if (core.getInput('create-csv')) {
+      fs.writeFileSync(core.getInput('create-csv'), report.toCSV(), { encoding: 'utf-8' })
+    }
+    if (core.getBooleanInput('create-summary')) {
+      core.summary.addRaw(report.toMarkdown())
+      core.summary.write()
+    }
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message)
   }
