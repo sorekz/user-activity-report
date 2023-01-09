@@ -26,12 +26,12 @@ jobs:
 
 
 ## Example report
-You can see the report in the action run summary
+You can see the report in the action run summary. Users are sorted by *Org member*, *Active*, an Activity Score with the most active users are listed on top.
 
 | User | Org member | Active | Commits | Created Issues | Issue Comments | Created PRs | Merged PRs | PR Comments | Created Discussions | Discussion Comments |
 |---|---|---|---|---|---|---|---|---|---|---|
-| daniel | ✔️ | ❌ | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | sorekz | ✔️ | ✔️ | 8 | 2 | 2 | 1 | 1 | 1 | 1 | 2 |
+| daniel | ✔️ | ❌ | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | dependabot | ❌ | ✔️ | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 |
 
 ## Inputs
@@ -92,8 +92,6 @@ default: `true`
 - Commits that have been authored but not committed before `since-days` are not counted. The commit date is relevant.
 - A merged pull request is counted both in *Created PRs* and *Merged PRs* if it was created and merged within `since-days`
 
-
-
 ## Rate limit cost
 The cost is nested so you can multiply each indention and sum it up. It is approximately:
 - 1 per 100 organization members
@@ -108,6 +106,9 @@ The cost is nested so you can multiply each indention and sum it up. It is appro
     - 1 per 100 discussion comments in each pull request
 
 Because the pull requests and discussions can not be queried based on a timestamp the action always fetches all but filters comments only for the objects that have updates (including added comments) since `since-days`.
+
+## Limitations
+- Discussions can currently not be analyzed on GHES because the graphQL schema is missing fields compared to the schema on Github.com
 
 ---
 
