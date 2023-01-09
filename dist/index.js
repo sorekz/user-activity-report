@@ -9926,18 +9926,20 @@ var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _argume
 };
 
 
+const IS_GITHUB_COM = process.env['GITHUB_API_URL'] === 'https://api.github.com';
 class GithubApi {
     constructor(token) {
         this.octokit = github.getOctokit(token, { baseUrl: process.env['GITHUB_API_URL'] }, dist_node/* paginateGraphql */.A);
     }
     getRateLimitRemaining() {
+        var _a;
         return __awaiter(this, void 0, void 0, function* () {
             const result = yield this.octokit.graphql(`query {
         rateLimit {
           remaining
         }
       }`);
-            return result.rateLimit.remaining;
+            return ((_a = result.rateLimit) === null || _a === void 0 ? void 0 : _a.remaining) || 5000;
         });
     }
     getOrgMembers(organization) {
@@ -9969,7 +9971,7 @@ class GithubApi {
               repository:node {
                 id
                 name
-                hasDiscussionsEnabled
+                ${IS_GITHUB_COM ? 'hasDiscussionsEnabled' : ''}
                 hasIssuesEnabled
               }
             }
@@ -9982,7 +9984,7 @@ class GithubApi {
       }`, {
                 organization
             });
-            return result.organization.repositories.edges.map(e => (Object.assign({}, e.repository)));
+            return result.organization.repositories.edges.map(e => (Object.assign(Object.assign({}, e.repository), { hasDiscussionsEnabled: e.repository.hasDiscussionsEnabled || false })));
         });
     }
     getRepoBranches(repoId) {
@@ -9992,9 +9994,9 @@ class GithubApi {
           ... on Repository {
             refs(refPrefix: "refs/heads/", first: 100, after: $cursor) {
               nodes {
-                  id
-                  name
-                }
+                id
+                name
+              }
               pageInfo {
                 hasNextPage
                 endCursor
@@ -10056,10 +10058,13 @@ class GithubApi {
                 branchId,
                 since
             });
-            return result.node.target.history.nodes.map(n => ({
-                author: n.author.user.login,
-                oid: n.oid
-            }));
+            return result.node.target.history.nodes.map(n => {
+                var _a;
+                return ({
+                    author: (_a = n.author.user) === null || _a === void 0 ? void 0 : _a.login,
+                    oid: n.oid
+                });
+            });
         });
     }
     getRepoIssues(repoId, since) {
@@ -10073,6 +10078,7 @@ class GithubApi {
             issues(first: 100, filterBy: {since: $since}, after: $cursor) {
               nodes {
                 id
+                number
                 author {
                   login
                 }
@@ -10089,7 +10095,7 @@ class GithubApi {
                 repoId,
                 since
             });
-            return result.node.issues.nodes.map(n => ({ id: n.id, author: n.author.login, createdAt: n.createdAt }));
+            return result.node.issues.nodes.map(n => { var _a; return ({ id: n.id, number: n.number, author: (_a = n.author) === null || _a === void 0 ? void 0 : _a.login, createdAt: n.createdAt }); });
         });
     }
     getIssueComments(issueId) {
@@ -10114,7 +10120,7 @@ class GithubApi {
       }`, {
                 issueId
             });
-            return result.node.comments.nodes.map(n => ({ createdAt: n.createdAt, author: n.author.login }));
+            return result.node.comments.nodes.map(n => { var _a; return ({ createdAt: n.createdAt, author: (_a = n.author) === null || _a === void 0 ? void 0 : _a.login }); });
         });
     }
     getRepoPullRequests(repoId) {
@@ -10125,6 +10131,7 @@ class GithubApi {
             pullRequests(first: 100, after: $cursor) {
               nodes {
                 id
+                number
                 author {
                   login
                 }
@@ -10146,9 +10153,9 @@ class GithubApi {
                 repoId
             });
             return result.node.pullRequests.nodes.map(n => {
-                var _a;
+                var _a, _b;
                 return ({
-                    id: n.id, author: n.author.login, createdAt: n.createdAt, updatedAt: n.updatedAt, mergedAt: n.mergedAt, mergedBy: (_a = n.mergedBy) === null || _a === void 0 ? void 0 : _a.login
+                    id: n.id, author: (_a = n.author) === null || _a === void 0 ? void 0 : _a.login, number: n.number, createdAt: n.createdAt, updatedAt: n.updatedAt, mergedAt: n.mergedAt, mergedBy: (_b = n.mergedBy) === null || _b === void 0 ? void 0 : _b.login
                 });
             });
         });
@@ -10175,7 +10182,7 @@ class GithubApi {
       }`, {
                 prId
             });
-            return result.node.comments.nodes.map(n => ({ author: n.author.login, createdAt: n.createdAt }));
+            return result.node.comments.nodes.map(n => { var _a; return ({ author: (_a = n.author) === null || _a === void 0 ? void 0 : _a.login, createdAt: n.createdAt }); });
         });
     }
     getRepoDiscussions(repoId) {
@@ -10186,6 +10193,7 @@ class GithubApi {
             discussions(first: 100, after: $cursor) {
               nodes {
                 id
+                number
                 author {
                   login
                 }
@@ -10202,7 +10210,7 @@ class GithubApi {
       }`, {
                 repoId
             });
-            return result.node.discussions.nodes.map(n => ({ id: n.id, author: n.author.login, createdAt: n.createdAt, updatedAt: n.updatedAt }));
+            return result.node.discussions.nodes.map(n => { var _a; return ({ id: n.id, number: n.number, author: (_a = n.author) === null || _a === void 0 ? void 0 : _a.login, createdAt: n.createdAt, updatedAt: n.updatedAt }); });
         });
     }
     getDiscussionComments(prId) {
@@ -10227,12 +10235,29 @@ class GithubApi {
       }`, {
                 prId
             });
-            return result.node.comments.nodes.map(n => ({ author: n.author.login, createdAt: n.createdAt }));
+            return result.node.comments.nodes.map(n => { var _a; return ({ author: (_a = n.author) === null || _a === void 0 ? void 0 : _a.login, createdAt: n.createdAt }); });
         });
     }
 }
 
 ;// CONCATENATED MODULE: ./lib/reportData.js
+function score(userData) {
+    return userData.commits
+        + userData.createdIssues + userData.issueComments
+        + userData.createdDiscussions + userData.discussionComments
+        + userData.createdPrs + userData.mergedPrs + userData.prComments;
+}
+function sorter(a, b) {
+    const data1 = a[1];
+    const data2 = b[1];
+    if (data1.isOrgMember !== data2.isOrgMember) {
+        return data1.isOrgMember ? -1 : 1;
+    }
+    if (data1.isActive !== data1.isActive) {
+        return data1.isActive ? -1 : 1;
+    }
+    return score(data2) - score(data1);
+}
 class ReportData {
     constructor(organization, analyzeOptions, report = {}) {
         this.organization = organization;
@@ -10337,7 +10362,7 @@ class ReportData {
         }
         buffer += '|\n';
         buffer += `${'|---'.repeat(numColumns)}|\n`;
-        for (const [username, data] of Object.entries(this.report)) {
+        for (const [username, data] of Object.entries(this.report).sort(sorter)) {
             buffer += `| ${username} | ${data.isOrgMember ? '✔️' : '❌'} | ${data.isActive ? '✔️' : '❌'} `;
             if ((_h = this.analyzeOptions) === null || _h === void 0 ? void 0 : _h.commits) {
                 buffer += `| ${data.commits} `;
@@ -10390,7 +10415,7 @@ class ReportData {
             buffer += ',Discussion Comments';
         }
         buffer += '\n';
-        for (const [username, data] of Object.entries(this.report)) {
+        for (const [username, data] of Object.entries(this.report).sort(sorter)) {
             buffer += `${username},${data.isOrgMember ? '1' : '0'},${data.isActive ? '1' : '0'}`;
             if ((_h = this.analyzeOptions) === null || _h === void 0 ? void 0 : _h.commits) {
                 buffer += `,${data.commits}`;
@@ -10439,39 +10464,48 @@ function createReport(token, organization, sinceDays, analyzeOptions) {
         const rateLimitStart = yield api.getRateLimitRemaining();
         const date = new Date();
         const since = new Date(date.setDate(date.getDate() - sinceDays)).toISOString();
+        core.debug('Reading org members');
         const orgMembers = yield api.getOrgMembers(organization);
         for (const member of orgMembers) {
             report.setOrgMember(member);
         }
+        core.debug('Getting org repositories');
         const repos = yield api.getOrgRepos(organization);
         for (const repo of repos) {
+            core.debug(`For ${repo.name} analyzing ...`);
             if (analyzeOptions.commits) {
                 // commits
-                const branches = analyzeOptions.commitsOnAllBranches ? yield api.getRepoBranches(repo.id) : [yield api.getRepoDefaultBranch(repo.id)];
+                core.debug('... commits');
+                const branches = (analyzeOptions.commitsOnAllBranches ? yield api.getRepoBranches(repo.id) : [yield api.getRepoDefaultBranch(repo.id)].filter(b => !!b));
                 const uniqueCommits = new Map(); // <oid, commit>
                 for (const branch of branches) {
+                    core.debug(`   ... on ${branch.name}`);
                     const commits = yield api.getBranchCommits(branch.id, since);
                     for (const commit of commits) {
                         uniqueCommits.set(commit.oid, commit);
                     }
                 }
                 for (const commit of uniqueCommits.values()) {
-                    report.addCommit(commit.author);
+                    if (commit.author) { // imported commits might not have a Github user reference and are ignored in the report
+                        report.addCommit(commit.author);
+                    }
                 }
             }
             if (analyzeOptions.issues) {
                 // issues
                 if (repo.hasIssuesEnabled) {
+                    core.debug('... issues');
                     const issues = yield api.getRepoIssues(repo.id, since);
                     for (const issue of issues) {
-                        if (new Date(issue.createdAt) > new Date(since)) {
+                        if (issue.author && new Date(issue.createdAt) > new Date(since)) {
                             report.addCreatedIssue(issue.author);
                         }
                         if (analyzeOptions.issueComments) {
                             // issue comments
+                            core.debug(`   ... issue comments on #${issue.number}`);
                             const issueComments = yield api.getIssueComments(issue.id);
                             for (const issueComment of issueComments) {
-                                if (new Date(issueComment.createdAt) > new Date(since)) {
+                                if (issue.author && new Date(issueComment.createdAt) > new Date(since)) {
                                     report.addIssueComment(issue.author);
                                 }
                             }
@@ -10481,9 +10515,10 @@ function createReport(token, organization, sinceDays, analyzeOptions) {
             }
             if (analyzeOptions.pullRequests) {
                 // prs
+                core.debug('... pull requests');
                 const prs = yield api.getRepoPullRequests(repo.id);
                 for (const pr of prs) {
-                    if (new Date(pr.createdAt) > new Date(since)) {
+                    if (pr.author && new Date(pr.createdAt) > new Date(since)) {
                         report.addCreatedPr(pr.author);
                     }
                     if (pr.mergedAt && pr.mergedBy && new Date(pr.mergedAt) > new Date(since)) {
@@ -10491,10 +10526,11 @@ function createReport(token, organization, sinceDays, analyzeOptions) {
                     }
                     if (analyzeOptions.pullRequestComments) {
                         // pr comments
+                        core.debug(`   ... pull request comments on #${pr.number}`);
                         if (new Date(pr.updatedAt) > new Date(since)) {
                             const comments = yield api.getRepoPullComments(pr.id);
                             for (const comment of comments) {
-                                if (new Date(comment.createdAt) > new Date(since)) {
+                                if (comment.author && new Date(comment.createdAt) > new Date(since)) {
                                     report.addPrComment(comment.author);
                                 }
                             }
@@ -10505,17 +10541,19 @@ function createReport(token, organization, sinceDays, analyzeOptions) {
             if (analyzeOptions.discussions) {
                 // discussions
                 if (repo.hasDiscussionsEnabled) {
+                    core.debug('... pull requests');
                     const discussions = yield api.getRepoDiscussions(repo.id);
                     for (const discussion of discussions) {
-                        if (new Date(discussion.createdAt) > new Date(since)) {
+                        if (discussion.author && new Date(discussion.createdAt) > new Date(since)) {
                             report.addCreatedDiscussion(discussion.author);
                         }
                         if (analyzeOptions.discussionComments) {
                             // discussions comments
+                            core.debug(`   ... discussion comments on #${discussion.number}`);
                             if (new Date(discussion.updatedAt) > new Date(since)) {
                                 const comments = yield api.getDiscussionComments(discussion.id);
                                 for (const comment of comments) {
-                                    if (new Date(comment.createdAt) > new Date(since)) {
+                                    if (comment.author && new Date(comment.createdAt) > new Date(since)) {
                                         report.addDiscussionComment(comment.author);
                                     }
                                 }
