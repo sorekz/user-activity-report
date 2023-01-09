@@ -22,6 +22,25 @@ export type AnalyzeOptions = {
     discussionComments: boolean
 }
 
+function score(userData: ReportUserData): number {
+    return userData.commits
+        + userData.createdIssues + userData.issueComments
+        + userData.createdDiscussions + userData.discussionComments
+        + userData.createdPrs + userData.mergedPrs + userData.prComments
+}
+
+function sorter(a: [string, ReportUserData], b: [string, ReportUserData]): number {
+    const data1 = a[1]
+    const data2 = b[1]
+    if (data1.isOrgMember !== data2.isOrgMember) {
+        return data1.isOrgMember ? -1 : 1
+    }
+    if (data1.isActive !== data1.isActive) {
+        return data1.isActive ? -1 : 1
+    }
+    return score(data2) - score(data1)
+}
+
 export class ReportData {
 
     constructor(private organization: string, private analyzeOptions?: AnalyzeOptions, private report: { [userName: string]: ReportUserData } = {}) { }
@@ -136,7 +155,7 @@ export class ReportData {
         }
         buffer += '|\n'
         buffer += `${'|---'.repeat(numColumns)}|\n`
-        for (const [username, data] of Object.entries(this.report)) {
+        for (const [username, data] of Object.entries(this.report).sort(sorter)) {
             buffer += `| ${username} | ${data.isOrgMember ? '✔️' : '❌'} | ${data.isActive ? '✔️' : '❌'} `
             if (this.analyzeOptions?.commits) {
                 buffer += `| ${data.commits} `
@@ -189,7 +208,7 @@ export class ReportData {
             buffer += ',Discussion Comments'
         }
         buffer += '\n'
-        for (const [username, data] of Object.entries(this.report)) {
+        for (const [username, data] of Object.entries(this.report).sort(sorter)) {
             buffer += `${username},${data.isOrgMember ? '1' : '0'},${data.isActive ? '1' : '0'}`
             if (this.analyzeOptions?.commits) {
                 buffer += `,${data.commits}`

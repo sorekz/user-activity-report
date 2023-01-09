@@ -1,6 +1,8 @@
 import * as github from '@actions/github'
 import { paginateGraphql } from '@octokit/plugin-paginate-graphql'
 
+const IS_GITHUB_COM = process.env['GITHUB_API_URL'] === 'https://api.github.com'
+
 export class GithubApi {
   octokit: ReturnType<typeof github.getOctokit> & ReturnType<typeof paginateGraphql>
 
@@ -10,7 +12,7 @@ export class GithubApi {
 
   async getRateLimitRemaining(): Promise<number> {
     const result = await this.octokit.graphql<{
-      rateLimit: {
+      rateLimit?: { // GHES has no rateLimit
         remaining: number
       }
     }>(
@@ -20,7 +22,7 @@ export class GithubApi {
         }
       }`
     )
-    return result.rateLimit.remaining
+    return result.rateLimit?.remaining || 5000
   }
 
   async getOrgMembers(organization: string): Promise<string[]> {
@@ -66,7 +68,7 @@ export class GithubApi {
             repository: {
               id: string
               name: string
-              hasDiscussionsEnabled: boolean
+              hasDiscussionsEnabled?: boolean
               hasIssuesEnabled: boolean
             }
           }[]
@@ -80,7 +82,7 @@ export class GithubApi {
               repository:node {
                 id
                 name
-                hasDiscussionsEnabled
+                ${IS_GITHUB_COM ? 'hasDiscussionsEnabled' : ''}
                 hasIssuesEnabled
               }
             }
@@ -95,7 +97,10 @@ export class GithubApi {
         organization
       }
     )
-    return result.organization.repositories.edges.map(e => ({ ...e.repository }))
+    return result.organization.repositories.edges.map(e => ({
+      ...e.repository,
+      hasDiscussionsEnabled: e.repository.hasDiscussionsEnabled || false
+    }))
   }
 
   async getRepoBranches(repoId: string): Promise<{ id: string, name: string }[]> {
@@ -114,9 +119,9 @@ export class GithubApi {
           ... on Repository {
             refs(refPrefix: "refs/heads/", first: 100, after: $cursor) {
               nodes {
-                  id
-                  name
-                }
+                id
+                name
+              }
               pageInfo {
                 hasNextPage
                 endCursor
@@ -159,7 +164,7 @@ export class GithubApi {
   }
 
   async getBranchCommits(branchId: string, since: string): Promise<{
-    author: string
+    author?: string
     oid: string
   }[]> {
     const result = await this.octokit.graphql.paginate<{
@@ -169,7 +174,7 @@ export class GithubApi {
             nodes: {
               oid: string // = git commit hash
               author: {
-                user: {
+                user?: {
                   login: string
                 }
               }
@@ -210,18 +215,19 @@ export class GithubApi {
       }
     )
     return result.node.target.history.nodes.map(n => ({
-      author: n.author.user.login,
+      author: n.author.user?.login,
       oid: n.oid
     }))
   }
 
-  async getRepoIssues(repoId: string, since: string): Promise<{ id: string, author: string, createdAt: string }[]> {
+  async getRepoIssues(repoId: string, since: string): Promise<{ id: string, number: number, author?: string, createdAt: string }[]> {
     const result = await this.octokit.graphql.paginate<{
       node: {
         issues: {
           nodes: {
             id: string
-            author: {
+            number: number,
+            author?: {
               login: string
             }
             createdAt: string
@@ -237,6 +243,7 @@ export class GithubApi {
             issues(first: 100, filterBy: {since: $since}, after: $cursor) {
               nodes {
                 id
+                number
                 author {
                   login
                 }
@@ -255,16 +262,16 @@ export class GithubApi {
         since
       }
     )
-    return result.node.issues.nodes.map(n => ({ id: n.id, author: n.author.login, createdAt: n.createdAt }))
+    return result.node.issues.nodes.map(n => ({ id: n.id, number: n.number, author: n.author?.login, createdAt: n.createdAt }))
   }
 
-  async getIssueComments(issueId: string): Promise<{ createdAt: string, author: string }[]> {
+  async getIssueComments(issueId: string): Promise<{ createdAt: string, author?: string }[]> {
     const result = await this.octokit.graphql.paginate<{
       node: {
         comments: {
           nodes: {
             createdAt: string
-            author: {
+            author?: {
               login: string
             }
           }[]
@@ -293,16 +300,17 @@ export class GithubApi {
         issueId
       }
     )
-    return result.node.comments.nodes.map(n => ({ createdAt: n.createdAt, author: n.author.login }))
+    return result.node.comments.nodes.map(n => ({ createdAt: n.createdAt, author: n.author?.login }))
   }
 
-  async getRepoPullRequests(repoId: string): Promise<{ id: string, author: string, createdAt: string, updatedAt: string, mergedBy?: string, mergedAt?: string }[]> {
+  async getRepoPullRequests(repoId: string): Promise<{ id: string, number: number, author?: string, createdAt: string, updatedAt: string, mergedBy?: string, mergedAt?: string }[]> {
     const result = await this.octokit.graphql.paginate<{
       node: {
         pullRequests: {
           nodes: {
             id: string
-            author: {
+            number: number
+            author?: {
               login: string
             }
             createdAt: string
@@ -321,6 +329,7 @@ export class GithubApi {
             pullRequests(first: 100, after: $cursor) {
               nodes {
                 id
+                number
                 author {
                   login
                 }
@@ -344,16 +353,16 @@ export class GithubApi {
       }
     )
     return result.node.pullRequests.nodes.map(n => ({
-      id: n.id, author: n.author.login, createdAt: n.createdAt, updatedAt: n.updatedAt, mergedAt: n.mergedAt, mergedBy: n.mergedBy?.login
+      id: n.id, author: n.author?.login, number: n.number, createdAt: n.createdAt, updatedAt: n.updatedAt, mergedAt: n.mergedAt, mergedBy: n.mergedBy?.login
     }))
   }
 
-  async getRepoPullComments(prId: string): Promise<{ author: string, createdAt: string }[]> {
+  async getRepoPullComments(prId: string): Promise<{ author?: string, createdAt: string }[]> {
     const result = await this.octokit.graphql.paginate<{
       node: {
         comments: {
           nodes: {
-            author: {
+            author?: {
               login: string
             }
             createdAt: string
@@ -383,16 +392,17 @@ export class GithubApi {
         prId
       }
     )
-    return result.node.comments.nodes.map(n => ({ author: n.author.login, createdAt: n.createdAt }))
+    return result.node.comments.nodes.map(n => ({ author: n.author?.login, createdAt: n.createdAt }))
   }
 
-  async getRepoDiscussions(repoId: string): Promise<{ id: string, author: string, createdAt: string, updatedAt: string }[]> {
+  async getRepoDiscussions(repoId: string): Promise<{ id: string, number: number, author?: string, createdAt: string, updatedAt: string }[]> {
     const result = await this.octokit.graphql.paginate<{
       node: {
         discussions: {
           nodes: {
             id: string
-            author: {
+            number: number
+            author?: {
               login: string
             }
             createdAt: string
@@ -407,6 +417,7 @@ export class GithubApi {
             discussions(first: 100, after: $cursor) {
               nodes {
                 id
+                number
                 author {
                   login
                 }
@@ -425,15 +436,15 @@ export class GithubApi {
         repoId
       }
     )
-    return result.node.discussions.nodes.map(n => ({ id: n.id, author: n.author.login, createdAt: n.createdAt, updatedAt: n.updatedAt }))
+    return result.node.discussions.nodes.map(n => ({ id: n.id, number: n.number, author: n.author?.login, createdAt: n.createdAt, updatedAt: n.updatedAt }))
   }
 
-  async getDiscussionComments(prId: string): Promise<{ author: string, createdAt: string }[]> {
+  async getDiscussionComments(prId: string): Promise<{ author?: string, createdAt: string }[]> {
     const result = await this.octokit.graphql.paginate<{
       node: {
         comments: {
           nodes: {
-            author: {
+            author?: {
               login: string
             }
             createdAt: string
@@ -463,6 +474,6 @@ export class GithubApi {
         prId
       }
     )
-    return result.node.comments.nodes.map(n => ({ author: n.author.login, createdAt: n.createdAt }))
+    return result.node.comments.nodes.map(n => ({ author: n.author?.login, createdAt: n.createdAt }))
   }
 }
