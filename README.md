@@ -1,7 +1,7 @@
 # user-activity-report
 Create a User Activity Report for your Github organization. The action uses the Github GraphQL API and depending on the size of your organization will fetch a lot of data.
 
-If you get an error because you reach the hourly rate limit of 5000 points you can either reduce the `since-days` or play with the other inputs. Comments cost a lot of points so you might want to disable them if not needed.
+If you get an error because you reach the hourly rate limit of 5000 points you can either reduce the report time frame (`since-days` or `since` and `until`) or play with the other inputs. Comments cost a lot of points so you might want to disable them if not needed.
 
 The action only fetches nested information on objects that have updates since `since-days`. So the total rate limit cost varies depending on the created/updated objects in the time window. It is printed at the end of the action and can be seen in the workflow logs.
 
@@ -35,7 +35,7 @@ You can see the report in the action run summary. Users are sorted by *Org membe
 | dependabot | ❌ | ✔️ | 0 | 0 | 0 | 8 | 0 | 0 | 0 | 0 |
 
 ## Example CSV and JSON reports
-You can enable the option to write the report as csv and/or json output and use the actions/upload-artifact action to upload them. The zip file containings both reports can be downloaded afterwards in the action run.
+You can enable the option to write the report as csv and/or json output and use the actions/upload-artifact action to upload them. The zip file containing both reports can be downloaded afterwards in the action run.
 ```yaml
 name: 'User Activity Report'
 on:
@@ -126,10 +126,10 @@ If the parameter `since` has a value, this parameter is ignored.\
 default: `90`
 
 ### since
-The ISO-8601 since date. `2023-12` is equal to `2023-12-01T00:00:00.000Z`
+The [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601) since date. `2023-12` is equal to `2023-12-01T00:00:00.000Z`
 
 ### until
-The ISO-8601 until date. This value is exclusive. E.g. `2024-01` will include results until `2023-12-31T23:59:59.999Z`.\
+The [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601) until date. This value is exclusive. E.g. `2024-01` will include results until `2023-12-31T23:59:59.999Z`.\
 If the parameter `since` has a value and this parameter has no value, it will default to `now`.\
 
 ### analyze-commits
@@ -176,23 +176,23 @@ default: `true`
 
 ## Need to know
 - Commits are only counted once. If you have `analyze-commits-on-all-branches` enabled then a commit that is part of multiple branches is only counted once. If you use merge commits a new commit with a new git ref is created and counted.
-- Commits that have been authored but not committed before `since-days` are not counted. The commit date is relevant.
-- A merged pull request is counted both in *Created PRs* and *Merged PRs* if it was created and merged within `since-days`
+- Commits that have been authored but not committed within the report time frame are not counted. The commit date is relevant.
+- A merged pull request is counted both in *Created PRs* and *Merged PRs* if it was created and merged within the report time frame
 
 ## Rate limit cost
 The cost is nested so you can multiply each indention and sum it up. It is approximately:
 - 1 per 100 organization members
 - 1 per 100 repositories
   - 1 per 100 branches in each repository
-    - 1 per 100 commits since `since-days` in each branch
-  - 1 per 100 issues created/updated `since-days` in each repository
+    - 1 per 100 commits within the report time frame in each branch
+  - 1 per 100 issues created/updated `since-days` or `since` in each repository
     - 1 per 100 issue comments in each issue
   - 1 per 100 pull requests in each repository
     - 1 per 100 pull request comments in each pull request
   - 1 per 100 discussions in each repository
     - 1 per 100 discussion comments in each pull request
 
-Because the pull requests and discussions can not be queried based on a timestamp the action always fetches all but filters comments only for the objects that have updates (including added comments) since `since-days`.
+Because the pull requests and discussions can not be queried based on a timestamp the action always fetches all comments, but filters comments only for the objects that have updates (including added comments) since `since-days` or `since`.
 
 ## Limitations
 - Discussions can currently not be analyzed on GHES because the graphQL schema is missing fields compared to the schema on Github.com
