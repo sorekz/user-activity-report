@@ -59,6 +59,60 @@ jobs:
             data.csv
 ```
 
+## Example to get monthly reports
+By passing the `since` and `until` parameters it's possible to generate monthly reports, or for any other time frames. Be aware that the [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601) value `2023-08` is equal to the first millisecond on 1st August and that the `until` parameter is exclusive. 
+
+The example creates a report for activities between `2023-07-01T00:00:00.000Z` and `2023-07-31T23:59:59.999Z`
+
+
+```yaml
+name: 'User Activity Report'
+on:
+  workflow_dispatch:
+  
+jobs:
+  'create-report':
+    runs-on: ubuntu-latest
+    steps:
+      - uses: sorekz/user-activity-report@v1
+        with:
+          token: ${{ secrets.TOKEN }}
+          organization: 'your-org'
+          since: 2023-07
+          until: 2023-08
+```
+
+## Example to get a report for the last month
+By passing the `since` and `until` parameters in combination with the [`actions/github-script`](https://github.com/) action it's possible to generate reports for the previous month. If this workflow is run on 2023-08-05 it will return results equal to `since: 2023-07` and `until: 2023-08`.
+
+
+```yaml
+name: 'User Activity Report'
+on:
+  workflow_dispatch:
+  
+jobs:
+  'create-report':
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v6
+        id: since-date
+        with:
+          script: return new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1) 
+          result-encoding: string
+      - uses: actions/github-script@v6
+        id: until-date
+        with:
+          script: return new Date(new Date().getFullYear(), new Date().getMonth(), 1) 
+          result-encoding: string
+      - uses: sorekz/user-activity-report@v1
+        with:
+          token: ${{ secrets.TOKEN }}
+          organization: 'your-org'
+          since: ${{ steps.since-date.outputs.result }}
+          until: ${{ steps.until-date.outputs.result }}
+```
+
 ## Inputs
 ### token
 **Required** Github access token for the organization. Required permissions are `repo`, `read:org`
@@ -67,8 +121,16 @@ jobs:
 **Required** The organization to create the report for
 
 ### since-days
-**Required** The number of days in the past to search for activity for. One day is relative to the start time and equal to 24 hours.\
+The number of days in the past to search for activity for. One day is relative to the start time and equal to 24 hours.\
+If the parameter `since` has a value, this parameter is ignored.\
 default: `90`
+
+### since
+The ISO-8601 since date. `2023-12` is equal to `2023-12-01T00:00:00.000Z`
+
+### until
+The ISO-8601 until date. This value is exclusive. E.g. `2024-01` will include results until `2023-12-31T23:59:59.999Z`.\
+If the parameter `since` has a value and this parameter has no value, it will default to `now`.\
 
 ### analyze-commits
 Enable to analyze commits\

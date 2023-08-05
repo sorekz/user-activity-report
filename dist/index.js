@@ -10027,14 +10027,14 @@ class GithubApi {
             return result.node.defaultBranchRef;
         });
     }
-    getBranchCommits(branchId, since) {
+    getBranchCommits(branchId, since, until) {
         return __awaiter(this, void 0, void 0, function* () {
-            const result = yield this.octokit.graphql.paginate(`query paginate($cursor: String, $branchId: ID!, $since: GitTimestamp!) {
+            const result = yield this.octokit.graphql.paginate(`query paginate($cursor: String, $branchId: ID!, $since: GitTimestamp!, $until: GitTimestamp!) {
         node(id: $branchId) {
           ... on Ref {
             target {
               ... on Commit {
-                history(first: 100, since: $since, after: $cursor) {
+                history(first: 100, since: $since, until: $until, after: $cursor) {
                   nodes {
                     ... on Commit {
                       oid
@@ -10056,7 +10056,8 @@ class GithubApi {
         }
       }`, {
                 branchId,
-                since
+                since,
+                until
             });
             return result.node.target.history.nodes.map(n => {
                 var _a;
@@ -10457,13 +10458,13 @@ var report_awaiter = (undefined && undefined.__awaiter) || function (thisArg, _a
 
 
 
-function createReport(token, organization, sinceDays, analyzeOptions) {
+function createReport(token, organization, since, until, analyzeOptions) {
     return report_awaiter(this, void 0, void 0, function* () {
         const api = new GithubApi(token);
         const report = new ReportData(organization, analyzeOptions);
         const rateLimitStart = yield api.getRateLimitRemaining();
-        const date = new Date();
-        const since = new Date(date.setDate(date.getDate() - sinceDays)).toISOString();
+        const sinceIsoString = since.toISOString();
+        const untilIsoString = until.toISOString();
         core.debug('Reading org members');
         const orgMembers = yield api.getOrgMembers(organization);
         for (const member of orgMembers) {
@@ -10472,7 +10473,7 @@ function createReport(token, organization, sinceDays, analyzeOptions) {
         core.debug('Getting org repositories');
         const repos = yield api.getOrgRepos(organization);
         for (const repo of repos) {
-            core.debug(`For ${repo.name} analyzing ...`);
+            core.debug(`Analyzing repository: ${repo.name}...`);
             if (analyzeOptions.commits) {
                 // commits
                 core.debug('... commits');
@@ -10480,7 +10481,7 @@ function createReport(token, organization, sinceDays, analyzeOptions) {
                 const uniqueCommits = new Map(); // <oid, commit>
                 for (const branch of branches) {
                     core.debug(`   ... on ${branch.name}`);
-                    const commits = yield api.getBranchCommits(branch.id, since);
+                    const commits = yield api.getBranchCommits(branch.id, sinceIsoString, untilIsoString);
                     for (const commit of commits) {
                         uniqueCommits.set(commit.oid, commit);
                     }
@@ -10495,9 +10496,10 @@ function createReport(token, organization, sinceDays, analyzeOptions) {
                 // issues
                 if (repo.hasIssuesEnabled) {
                     core.debug('... issues');
-                    const issues = yield api.getRepoIssues(repo.id, since);
+                    const issues = yield api.getRepoIssues(repo.id, sinceIsoString);
                     for (const issue of issues) {
-                        if (issue.author && new Date(issue.createdAt) > new Date(since)) {
+                        const createdAt = new Date(issue.createdAt);
+                        if (issue.author && createdAt >= since && createdAt < until) {
                             report.addCreatedIssue(issue.author);
                         }
                         if (analyzeOptions.issueComments) {
@@ -10505,7 +10507,8 @@ function createReport(token, organization, sinceDays, analyzeOptions) {
                             core.debug(`   ... issue comments on #${issue.number}`);
                             const issueComments = yield api.getIssueComments(issue.id);
                             for (const issueComment of issueComments) {
-                                if (issue.author && new Date(issueComment.createdAt) > new Date(since)) {
+                                const commentCreatedAt = new Date(issueComment.createdAt);
+                                if (issue.author && commentCreatedAt >= since && commentCreatedAt < until) {
                                     report.addIssueComment(issue.author);
                                 }
                             }
@@ -10518,19 +10521,24 @@ function createReport(token, organization, sinceDays, analyzeOptions) {
                 core.debug('... pull requests');
                 const prs = yield api.getRepoPullRequests(repo.id);
                 for (const pr of prs) {
-                    if (pr.author && new Date(pr.createdAt) > new Date(since)) {
+                    const createdAt = new Date(pr.createdAt);
+                    if (pr.author && createdAt >= since && createdAt < until) {
                         report.addCreatedPr(pr.author);
                     }
-                    if (pr.mergedAt && pr.mergedBy && new Date(pr.mergedAt) > new Date(since)) {
-                        report.addMergedPr(pr.mergedBy);
+                    if (pr.mergedAt && pr.mergedBy) {
+                        const mergedAt = new Date(pr.mergedAt);
+                        if (mergedAt >= since && mergedAt < until) {
+                            report.addMergedPr(pr.mergedBy);
+                        }
                     }
                     if (analyzeOptions.pullRequestComments) {
                         // pr comments
                         core.debug(`   ... pull request comments on #${pr.number}`);
-                        if (new Date(pr.updatedAt) > new Date(since)) {
+                        if (new Date(pr.updatedAt) >= since) {
                             const comments = yield api.getRepoPullComments(pr.id);
                             for (const comment of comments) {
-                                if (comment.author && new Date(comment.createdAt) > new Date(since)) {
+                                const commentCreatedAt = new Date(comment.createdAt);
+                                if (comment.author && commentCreatedAt >= since && commentCreatedAt < until) {
                                     report.addPrComment(comment.author);
                                 }
                             }
@@ -10544,16 +10552,18 @@ function createReport(token, organization, sinceDays, analyzeOptions) {
                     core.debug('... pull requests');
                     const discussions = yield api.getRepoDiscussions(repo.id);
                     for (const discussion of discussions) {
-                        if (discussion.author && new Date(discussion.createdAt) > new Date(since)) {
+                        const createdAt = new Date(discussion.createdAt);
+                        if (discussion.author && createdAt >= since && createdAt < until) {
                             report.addCreatedDiscussion(discussion.author);
                         }
                         if (analyzeOptions.discussionComments) {
                             // discussions comments
                             core.debug(`   ... discussion comments on #${discussion.number}`);
-                            if (new Date(discussion.updatedAt) > new Date(since)) {
+                            if (new Date(discussion.updatedAt) >= since) {
                                 const comments = yield api.getDiscussionComments(discussion.id);
                                 for (const comment of comments) {
-                                    if (comment.author && new Date(comment.createdAt) > new Date(since)) {
+                                    const commentCreatedAt = new Date(comment.createdAt);
+                                    if (comment.author && commentCreatedAt >= since && commentCreatedAt < until) {
                                         report.addDiscussionComment(comment.author);
                                     }
                                 }
@@ -10598,7 +10608,14 @@ function run() {
             options.issueComments = options.issues && options.issueComments;
             options.pullRequestComments = options.pullRequests && options.pullRequestComments;
             options.discussionComments = options.discussions && options.discussionComments;
-            const report = yield createReport(core.getInput('token'), core.getInput('organization'), parseInt(core.getInput('since-days')), options);
+            const date = new Date();
+            const since = core.getInput('since')
+                ? new Date(core.getInput('since'))
+                : new Date(date.setDate(date.getDate() - parseInt(core.getInput('since-days'))));
+            const until = core.getInput('until') ? new Date(core.getInput('until')) : new Date();
+            core.debug(`since: ${since}`);
+            core.debug(`until: ${until}`);
+            const report = yield createReport(core.getInput('token'), core.getInput('organization'), since, until, options);
             if (core.getInput('create-json')) {
                 external_fs_.writeFileSync(core.getInput('create-json'), report.toJSON(), { encoding: 'utf-8' });
             }

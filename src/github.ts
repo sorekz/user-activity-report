@@ -12,7 +12,7 @@ export class GithubApi {
 
   async getRateLimitRemaining(): Promise<number> {
     const result = await this.octokit.graphql<{
-      rateLimit?: { // GHES has no rateLimit
+      rateLimit?: { // rate limit might be disabled on GHES
         remaining: number
       }
     }>(
@@ -163,7 +163,7 @@ export class GithubApi {
     return result.node.defaultBranchRef
   }
 
-  async getBranchCommits(branchId: string, since: string): Promise<{
+  async getBranchCommits(branchId: string, since: string, until: string): Promise<{
     author?: string
     oid: string
   }[]> {
@@ -183,12 +183,12 @@ export class GithubApi {
         }
       }
     }>(
-      `query paginate($cursor: String, $branchId: ID!, $since: GitTimestamp!) {
+      `query paginate($cursor: String, $branchId: ID!, $since: GitTimestamp!, $until: GitTimestamp!) {
         node(id: $branchId) {
           ... on Ref {
             target {
               ... on Commit {
-                history(first: 100, since: $since, after: $cursor) {
+                history(first: 100, since: $since, until: $until, after: $cursor) {
                   nodes {
                     ... on Commit {
                       oid
@@ -211,7 +211,8 @@ export class GithubApi {
       }`,
       {
         branchId,
-        since
+        since,
+        until
       }
     )
     return result.node.target.history.nodes.map(n => ({
