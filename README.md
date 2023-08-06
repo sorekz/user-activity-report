@@ -130,7 +130,7 @@ The [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601) since date. `2023-12` is 
 
 ### until
 The [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601) until date. This value is exclusive. E.g. `2024-01` will include results until `2023-12-31T23:59:59.999Z`.\
-If the parameter `since` has a value and this parameter has no value, it will default to `now`.\
+If the parameter `since` has a value and this parameter has no value, it defaults to the current time.
 
 ### analyze-commits
 Enable to analyze commits\
