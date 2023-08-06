@@ -19,10 +19,20 @@ async function run(): Promise<void> {
     options.pullRequestComments = options.pullRequests && options.pullRequestComments
     options.discussionComments = options.discussions && options.discussionComments
 
+    const date = new Date()
+    const since = core.getInput('since')
+      ? new Date(core.getInput('since'))
+      : new Date(date.setDate(date.getDate() - parseInt(core.getInput('since-days'))))
+    const until = core.getInput('until') ? new Date(core.getInput('until')) : new Date()
+
+    core.debug(`since: ${since}`)
+    core.debug(`until: ${until}`)
+
     const report = await createReport(
       core.getInput('token'),
       core.getInput('organization'),
-      parseInt(core.getInput('since-days')),
+      since,
+      until,
       options
     )
 

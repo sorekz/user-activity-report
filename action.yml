@@ -12,6 +12,10 @@ inputs:
     description: 'The number of days in the past to search for activity for'
     required: true
     default: 90
+  since:
+    description: 'The ISO-8601 since date. "2023-12" is equal to "2023-12-01T00:00:00.000Z"'
+  until:
+    description: 'The ISO-8601 until date. This value is exclusive. E.g. "2024-01" will include results until "2023-12-31T23:59:59.999Z"'
   analyze-commits:
     description: 'Enable to analyze commits'
     default: true
